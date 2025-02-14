@@ -96,9 +96,11 @@
   <ItemGroup>
     <Content Include="Content\editor.css" />
     <Content Include="Content\Images\logo.jpg" />
+    <Content Include="Content\Sql\script.sql" />
     <Content Include="Content\styles.css" />
     <Content Include="Global.asax" />
     <Content Include="Handlers\LogoutHandler.aspx" />
+    <Content Include="Content\PPT\동원산업 과제 PPT %28인턴 신도영%29.pptx" />
     <None Include="Scripts\jquery-3.7.1.intellisense.js" />
     <Content Include="Scripts\editor.js" />
     <Content Include="Scripts\jquery-3.7.1.js" />
