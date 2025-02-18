@@ -42,6 +42,7 @@ namespace groupware2
 
                 bool isAdmin = Session["IsAdmin"] != null && (bool)Session["IsAdmin"];
                 hlList.NavigateUrl = isAdmin ? "AdminList.aspx" : "List.aspx";
+
             }
             LoadComments();
         }
@@ -57,7 +58,19 @@ namespace groupware2
                     lblContent.Text = HttpUtility.HtmlDecode(post.Content);
                     lblAuthorName.Text = HttpUtility.HtmlDecode(post.AuthorName);
                     lblCreatedAt.Text = post.CreatedAt.ToString("yyyy-MM-dd");
+                    lblView.Text = post.Views.ToString();
                     if (!post.HasDocument) lbDocument.Visible = false;
+
+                    // IP를 활용한 조회수 저장
+                    var db = RedisManager.Connection.GetDatabase();
+                    string key = $"Post:{Id}";
+                    string userIP = Request.UserHostAddress;
+                    if (!db.SetContains(key, userIP))
+                    {
+                        db.SetAdd(key, userIP);
+                        post.Views += 1;
+                        context.SaveChanges();
+                    }
                 }
                 else
                 {

@@ -47,6 +47,13 @@
                         <ItemStyle Width="150px" CssClass="form-label"/>
                         <HeaderStyle Width="150px" CssClass="form-label"/>
                     </asp:TemplateField>
+                    <asp:TemplateField HeaderText="조회수" SortExpression="Views">
+                        <ItemTemplate>
+                            <asp:Label runat="server" Text='<%# Eval("Views") %>'/>
+                        </ItemTemplate>
+                        <ItemStyle Width="70px" CssClass="form-label"/>
+                        <HeaderStyle Width="70px" CssClass="form-label"/>
+                    </asp:TemplateField>
                 </Columns>
             </asp:GridView>
 

@@ -184,6 +184,10 @@
     <Compile Include="Migrations\202502130817340_InitialCreate.Designer.cs">
       <DependentUpon>202502130817340_InitialCreate.cs</DependentUpon>
     </Compile>
+    <Compile Include="Migrations\202502180749501_AddViewsToPost.cs" />
+    <Compile Include="Migrations\202502180749501_AddViewsToPost.Designer.cs">
+      <DependentUpon>202502180749501_AddViewsToPost.cs</DependentUpon>
+    </Compile>
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Models\Document.cs" />
     <Compile Include="Utils\MailHelper.cs" />
@@ -298,6 +302,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\202502130817340_InitialCreate.resx">
       <DependentUpon>202502130817340_InitialCreate.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202502180749501_AddViewsToPost.resx">
+      <DependentUpon>202502180749501_AddViewsToPost.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup />

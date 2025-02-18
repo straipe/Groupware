@@ -18,6 +18,10 @@
                 <span class="text-gray">
                     <asp:Label ID="lblCreatedAt" runat="server" Text=""></asp:Label>
                 </span>
+                <img src="~/Content/Images/view-icon.png" style="width: 20px; margin-left:10px;" runat="server"/>
+                <span class="text-gray">
+                    <asp:Label ID="lblView" runat="server" Text="1"></asp:Label>
+                </span>
             </div>
             <hr class="gray-line"/>
 

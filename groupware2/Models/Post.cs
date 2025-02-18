@@ -16,6 +16,7 @@ namespace groupware2.Models
         public string AuthorEmail { get; set; }
         public bool IsRemove { get; set; }
         public bool HasDocument { get; set; }
+        public int Views {  get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }
