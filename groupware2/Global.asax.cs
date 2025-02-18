@@ -1,13 +1,22 @@
 ﻿using System;
 using System.Web;
+using groupware2.Utils;
+using StackExchange.Redis;
 
 namespace groupware2
 {
     public class Global : System.Web.HttpApplication
     {
-
         protected void Application_Start(object sender, EventArgs e)
-        {}
+        {
+            var redis = RedisManager.Connection;
+            var server = redis.GetServer("localhost", 6379);
+            var db = redis.GetDatabase();
+            foreach (var key in server.Keys(pattern: "Document:*"))
+            {
+                db.KeyDelete(key);
+            }
+        }
 
         protected void Application_BeginRequest(object sender, EventArgs e)
         {
