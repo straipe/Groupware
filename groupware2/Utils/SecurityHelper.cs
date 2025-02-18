@@ -56,7 +56,7 @@ namespace groupware2.Utils
                     return FixedTimeEquals(storedHash, computedHash);
                 }
             }
-            catch (Exception ex) {
+            catch {
                 return false;
             }
         }
