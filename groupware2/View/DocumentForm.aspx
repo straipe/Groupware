@@ -14,6 +14,10 @@
                 <span class="text-gray">
                     <asp:Label ID="lblCreatedAt" runat="server" Text=""></asp:Label>
                 </span>
+                <img src="~/Content/Images/view-icon.png" style="width: 20px; margin-left:10px;" runat="server"/>
+                <span class="text-gray">
+                    <asp:Label ID="lblView" runat="server" Text="1"></asp:Label>
+                </span>
             </div>
             <hr class="gray-line"/>
 
@@ -30,12 +34,11 @@
                     <div class="editor-container__editor"><div id="editor"></div></div>
                 </div>
              </div>
-            <asp:HiddenField ID="hiddenContent" runat="server" />
             
             <!-- 버튼 -->
             <div class="row-list">
                 <div class="row-list">
-                    <asp:Button ID="btnLoad" runat="server" Text="불러오기" CssClass="sky-btn" OnClick="BtnLoad_Click" />
+                    <asp:Button ID="btnLoad" runat="server" Text="PDF" CssClass="sky-btn" OnClick="BtnUpdate_Click" />
                     <asp:Button ID="btnUpdate" runat="server" Text="저장" CssClass="sky-btn" OnClick="BtnUpdate_Click" />
                 </div>
                 <div class="row-list">
@@ -58,6 +61,7 @@
     <script>
         let editorInstance;
         let isSyncing = false;
+        var groupName = '<%= HttpUtility.HtmlEncode(Request.QueryString["Id"]) %>';
 
         // CKEditor 설정
         DecoupledEditor.create(document.querySelector('#editor'), editorConfig).then(editor => {
@@ -69,7 +73,6 @@
         // SignalR를 위한 송신, 수신 함수
         $(function () {
             var docHub = $.connection.documentHub;
-            var groupName = '<%= HttpUtility.HtmlEncode(Request.QueryString["Id"]) %>';
 
             // 서버에서 데이터 수신
             docHub.client.ReceiveTitle = function (title) {
@@ -79,8 +82,12 @@
             docHub.client.ReceiveContent = function (content) {
                 isSyncing = true;
                 editorInstance.setData(content);
-                setTimeout(() => { isSyncing = false; }, 10);
+                isSyncing = false;
             };
+
+            docHub.client.ReceiveView = function (view) {
+                $("#<%= lblView.ClientID %>").text(view);
+            }
 
             // 입력 시 변경 사항 전송
             $("#<%= txtTitle.ClientID %>").on("input", function () {
@@ -89,7 +96,7 @@
 
             editorInstance.model.document.on('change:data', function () {
                 if (isSyncing) return;
-                setTimeout(() => docHub.server.updateContent(groupName, document.querySelector('#editor').innerHTML), 10);
+                setTimeout(() => docHub.server.updateContent(groupName, editorInstance.getData()), 10);
             });
 
             $.connection.hub.start().done(function () {
@@ -97,12 +104,11 @@
                 docHub.server.joinGroup(groupName);
                 console.log(groupName+"번 그룹에 참여하셨습니다.");
             });
-        });
 
-        // 저장 버튼
-        document.getElementById('Content_btnUpdate').addEventListener('click', function () {
-            var editorHtml = document.getElementById('editor').innerHTML;
-            document.getElementById('<%= hiddenContent.ClientID %>').value = encodeURIComponent(editorHtml);
+            window.addEventListener("beforeunload", function () {
+                docHub.server.leaveGroup(groupName);
+                $.connection.hub.stop()
+            });
         });
     </script>
 </asp:Content>
