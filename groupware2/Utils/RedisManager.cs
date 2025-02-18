@@ -12,5 +12,13 @@ namespace groupware2.Utils
         new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect("localhost, allowAdmin=true"));
 
         public static ConnectionMultiplexer Connection => lazyConnection.Value;
+    
+        public static bool IsLock(string key, int time)
+        {
+            string lockValue = Guid.NewGuid().ToString();
+            TimeSpan expiry = TimeSpan.FromMilliseconds(time);
+            var db = Connection.GetDatabase();
+            return db.StringSet("lock:"+key, lockValue, expiry, When.NotExists);
+        }
     }
 }
