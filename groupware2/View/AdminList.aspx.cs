@@ -52,8 +52,10 @@ namespace groupware2
                 GridView1.DataBind();
 
                 int PageNavSize = Convert.ToInt32(App_GlobalResources.Constants.PageSize);
-                BtnPrevious.Enabled = pageIndex > PageNavSize;
-                BtnNext.Enabled = pageIndex + PageNavSize < (int)Session["TotalPages"];
+                BtnPrevious.Enabled = pageIndex != 0;
+                BtnPrevious.Visible = BtnPrevious.Enabled;
+                BtnNext.Enabled = pageIndex != (int)Session["TotalPages"] - 1;
+                BtnNext.Visible = BtnNext.Enabled;
                 GeneratePageNumbers();
             }
         }
@@ -64,7 +66,7 @@ namespace groupware2
             int pageIndex = Session["PageIndex"] != null ? (int)Session["PageIndex"] : 0;
             int PageNavSize = Convert.ToInt32(App_GlobalResources.Constants.PageSize);
             int StartPageNum = pageIndex / PageNavSize;
-            for (int i = StartPageNum * PageNavSize; i < (StartPageNum + 1) * 5 && i < totalPages; i++)
+            for (int i = StartPageNum * PageNavSize; i < (StartPageNum + 1) * PageNavSize && i < totalPages; i++)
             {
                 string pageNumber = (i + 1).ToString();  // 페이지 번호 계산
                 string commandArgument = (i).ToString();  // 페이지 인덱스
@@ -96,22 +98,16 @@ namespace groupware2
         {
             int pageIndex = (int)Session["PageIndex"];
             int PageNavSize = Convert.ToInt32(App_GlobalResources.Constants.PageSize);
-            if (pageIndex > PageNavSize)
-            {
-                Session["PageIndex"] = pageIndex - PageNavSize;
-                Reload();
-            }
+            Session["PageIndex"] = Math.Max(pageIndex - PageNavSize, 0);
+            Reload();
         }
 
         protected void BtnNext_Click(object sender, EventArgs e)
         {
             int pageIndex = (int)Session["PageIndex"];
             int PageNavSize = Convert.ToInt32(App_GlobalResources.Constants.PageSize);
-            if (pageIndex + PageNavSize < (int)Session["TotalPages"])
-            {
-                Session["PageIndex"] = pageIndex + PageNavSize;
-                Reload();
-            }
+            Session["PageIndex"] = Math.Min(pageIndex + PageNavSize, (int)Session["TotalPages"] - 1);
+            Reload();
         }
 
         protected void PageButton_Click(object sender, EventArgs e)
