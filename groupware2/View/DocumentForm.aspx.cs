@@ -53,12 +53,12 @@ namespace groupware2.View
                 using (var context = new AppDBContext())
                 {
                     var document = context.Documents.FirstOrDefault(d => d.Id == Id);
-                    _redis.HashSet(key, "title", document.Title);
-                    _redis.HashSet(key, "content", document.Content);
+                    _redis.HashSet(key, "title", HttpUtility.HtmlDecode(document.Title));
+                    _redis.HashSet(key, "content", HttpUtility.HtmlDecode(document.Content));
                 }
             }
-            txtTitle.Text = _redis.HashGet(key, "title");
-            string content = HttpUtility.HtmlDecode(_redis.HashGet(key, "content").ToString().Replace("'", "\\'"));
+            txtTitle.Text = _redis.HashGet(key, "title").ToString();
+            string content = _redis.HashGet(key, "content").ToString();
             string script = $"document.querySelector('#editor').innerHTML = '{content}';";
             ScriptManager.RegisterStartupScript(this, this.GetType(), "AddContent", script, true);
         }
