@@ -72,10 +72,11 @@ namespace groupware2.Hubs
         public void UpdateContent(string groupName, string content)
         {
             Debug.WriteLine($"전송받은 데이터: {content}");
-            string key = $"Document:{groupName}";
-            if (!RedisManager.IsLock(key, 5)) return;
-            _redis.HashSet(key, "content", content);
-            Clients.OthersInGroup(groupName).ReceiveContent(_redis.HashGet(key, "content").ToString());
+            Clients.OthersInGroup(groupName).ReceiveContent(content);
+            //string key = $"Document:{groupName}";
+            //if (!RedisManager.IsLock(key, 5)) return;
+            //_redis.HashSet(key, "content", content);
+            //Clients.OthersInGroup(groupName).ReceiveContent(_redis.HashGet(key, "content").ToString());
         }
     }
 }

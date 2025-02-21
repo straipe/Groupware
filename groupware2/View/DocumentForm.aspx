@@ -24,7 +24,7 @@
             <!-- 문서 이름 입력 -->
             <asp:Label ID="lblTitle" runat="server" Text="문서 이름" CssClass="form-label" />
             <asp:TextBox ID="txtTitle" runat="server" Width="100%" CssClass="form-control" />
-            
+                              
             <!-- 문서 내용 입력 -->
             <asp:Label ID="lblContent" runat="server" Text="내용" CssClass="form-label" />
             <div class="editor-container editor-container_document-editor editor-container_include-style" id="editor-container">
@@ -62,13 +62,17 @@
         let editorInstance;
         let isSyncing = false;
         var groupName = '<%= HttpUtility.HtmlEncode(Request.QueryString["Id"]) %>';
+        let startOperIdx = 1;
 
         // CKEditor 설정
         DecoupledEditor.create(document.querySelector('#editor'), editorConfig).then(editor => {
             editorInstance = editor;
             document.querySelector('#editor-toolbar').appendChild(editor.ui.view.toolbar.element);
             document.querySelector('#editor-menu-bar').appendChild(editor.ui.view.menuBarView.element);
+            const operations = editorInstance.model.document.history.getOperations();
+            startOperIdx = operations.length;
         });
+
 
         // SignalR를 위한 송신, 수신 함수
         $(function () {
@@ -80,9 +84,25 @@
             };
 
             docHub.client.ReceiveContent = function (content) {
-                isSyncing = true;
-                editorInstance.setData(content);
-                isSyncing = false;
+                const updates = JSON.parse(content);
+                for (let i = 0; i < updates.length; i++) {
+                    let update = updates[i];
+                    isSyncing = true;
+                    //editorInstance.model.applyOperation(update);
+                    if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
+                    else if (update.__className === "MoveOperation") applyMoveOperation(editorInstance, update);
+                    else if (update.__className === "AttributeOperation") applyAttributeOperation(editorInstance, update);
+                    else if (update.__className === "SplitOperation") applySplitOperation(editorInstance, update);
+                    else if (update.__className === "MergeOperation") applyMergeOperation(editorInstance, update);
+                    else if (update.__className === "RenameOperation") applyRenameOperation(editorInstance, update);
+                }
+
+                console.log("<수신 내역>")
+                console.log(updates);
+
+                //isSyncing = true;
+                //editorInstance.setData(content);
+                //isSyncing = false;
             };
 
             docHub.client.ReceiveView = function (view) {
@@ -94,9 +114,19 @@
                 docHub.server.updateTitle(groupName, $(this).val());
             });
 
-            editorInstance.model.document.on('change:data', function () {
-                if (isSyncing) return;
-                setTimeout(() => docHub.server.updateContent(groupName, editorInstance.getData()), 10);
+            editorInstance.model.document.on('change:data', function (evt, batch) {
+                if (isSyncing) {
+                    isSyncing = false;
+                    return;
+                }
+                console.log("<배치 내역>")
+                console.log(batch.operations.filter((op) => op.isDocumentOperation));
+                const sendOperations = batch.operations.filter((op) => op.isDocumentOperation).map((op) => op.toJSON());
+                docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
+                //startOperIdx = operations.length;
+
+                //if (isSyncing) return;
+                //setTimeout(() => docHub.server.updateContent(groupName, editorInstance.getData()), 10);
             });
 
             $.connection.hub.start().done(function () {
@@ -110,5 +140,106 @@
                 $.connection.hub.stop()
             });
         });
+
+        function applyInsertOperation(editor, operation) {
+            editor.model.change(writer => {
+                const position = editor.model.createPositionFromPath(
+                    editor.model.document.getRoot(operation.position.root),
+                    operation.position.path
+                );
+
+                if (operation.nodes[0].data !== undefined) {
+                    if (operation.nodes[0].attributes !== undefined) writer.insertText(operation.nodes[0].data, operation.nodes[0].attributes, position);
+                    else writer.insertText(operation.nodes[0].data, position);
+                } else if (operation.nodes[0].name !== undefined) {
+                    const element = writer.createElement(operation.nodes[0].name);
+                    writer.insert(element, position);
+                    
+                }
+            });
+        }
+
+        function applyMoveOperation(editor, operation) {
+            editor.model.change(writer => {
+                const sourceRange = editor.model.createRange(
+                    editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.sourcePosition.root),
+                        operation.sourcePosition.path
+                    ),
+                    editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.sourcePosition.root),
+                        operation.sourcePosition.path.map((v, i) => (i === operation.sourcePosition.path.length - 1 ? v + operation.howMany : v))
+                    )
+                );
+
+                const targetPosition = editor.model.createPositionFromPath(
+                    editor.model.document.getRoot(operation.targetPosition.root),
+                    operation.targetPosition.path
+                );
+
+                writer.move(sourceRange, targetPosition);
+            });
+        }
+
+        function applyAttributeOperation(editor, operation) {
+            editor.model.change(writer => {
+                if (operation.key.startsWith("selection:")) {
+                    const selectionKey = operation.key.substring("selection:".length);
+                    writer.setSelectionAttribute(selectionKey, operation.newValue);
+                }
+                else {
+                    const startPosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.range.start.root),
+                        operation.range.start.path
+                    );
+
+                    const endPosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.range.end.root),
+                        operation.range.end.path
+                    );
+
+                    const range = editor.model.createRange(startPosition, endPosition);
+
+                    writer.setAttribute(operation.key, operation.newValue, range);
+                }
+            });
+        }
+
+        function applySplitOperation(editor, operation) {
+            editor.model.change(writer => {
+                const splitPosition = editor.model.createPositionFromPath(
+                    editor.model.document.getRoot(operation.splitPosition.root),
+                    operation.splitPosition.path
+                );
+                writer.split(splitPosition);
+            });
+        }
+
+        function applyMergeOperation(editor, operation) {
+            editor.model.change(writer => {
+                operation.sourcePosition.path.pop()
+
+                const sourcePosition = editor.model.createPositionFromPath(
+                    editor.model.document.getRoot(operation.sourcePosition.root),
+                    operation.sourcePosition.path
+                );
+
+                writer.merge(sourcePosition)
+            });
+        }
+
+        function applyRenameOperation(editor, operation) {
+            editor.model.change(writer => {
+                operation.position.path.push(0)
+
+                const sourcePosition = editor.model.createPositionFromPath(
+                    editor.model.document.getRoot("main"),
+                    operation.position.path
+                );
+                
+                const sourceParent = sourcePosition.parent;
+                writer.rename(sourceParent, operation.newName);
+            })
+        }
     </script>
 </asp:Content>
