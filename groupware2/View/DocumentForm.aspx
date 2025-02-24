@@ -62,7 +62,7 @@
         let editorInstance;
         let isSyncing = false;
         var groupName = '<%= HttpUtility.HtmlEncode(Request.QueryString["Id"]) %>';
-        let startOperIdx = 1;
+        let baseVersion = 0;
 
         // CKEditor 설정
         DecoupledEditor.create(document.querySelector('#editor'), editorConfig).then(editor => {
@@ -87,8 +87,11 @@
                 const updates = JSON.parse(content);
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
+                    console.log(update)
+                    console.log("now: "+ baseVersion)
+                    if (update.baseVersion <= baseVersion) continue;
                     isSyncing = true;
-                    //editorInstance.model.applyOperation(update);
+                    baseVersion = update.baseVersion;
                     if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
                     else if (update.__className === "MoveOperation") applyMoveOperation(editorInstance, update);
                     else if (update.__className === "AttributeOperation") applyAttributeOperation(editorInstance, update);
@@ -123,7 +126,7 @@
                 console.log(batch.operations.filter((op) => op.isDocumentOperation));
                 const sendOperations = batch.operations.filter((op) => op.isDocumentOperation).map((op) => op.toJSON());
                 docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
-                //startOperIdx = operations.length;
+                baseVersion = sendOperations.at(-1).baseVersion;
 
                 //if (isSyncing) return;
                 //setTimeout(() => docHub.server.updateContent(groupName, editorInstance.getData()), 10);
@@ -147,14 +150,27 @@
                     editor.model.document.getRoot(operation.position.root),
                     operation.position.path
                 );
-
+                console.log(operation)
                 if (operation.nodes[0].data !== undefined) {
                     if (operation.nodes[0].attributes !== undefined) writer.insertText(operation.nodes[0].data, operation.nodes[0].attributes, position);
                     else writer.insertText(operation.nodes[0].data, position);
                 } else if (operation.nodes[0].name !== undefined) {
-                    const element = writer.createElement(operation.nodes[0].name);
-                    writer.insert(element, position);
-                    
+                    if (operation.nodes[0].children !== undefined) {
+
+                        for (let i = 0; i < operation.nodes.length; i++) {
+                            let node = operation.nodes[i]
+                            const tag = node.name;
+                            const text = node.children[0].data;
+                            const element = writer.createElement(tag);
+                            writer.insert(element, position);
+
+                            if (node.attributes !== undefined) writer.insertText(text, node.attributes, element);
+                            else writer.insertText(text, element);
+                        }
+                    } else {
+                        const element = writer.createElement(operation.nodes[0].name);
+                        writer.insert(element, position);
+                    }
                 }
             });
         }
