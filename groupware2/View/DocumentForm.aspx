@@ -85,6 +85,8 @@
 
             docHub.client.ReceiveContent = function (content) {
                 const updates = JSON.parse(content);
+                let pcount = 0;
+
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
                     console.log(update)
@@ -92,7 +94,9 @@
                     if (update.baseVersion <= baseVersion) continue;
                     isSyncing = true;
                     baseVersion = update.baseVersion;
-                    if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
+                    if (update.nodes !== undefined && update.nodes[0].name !== undefined && update.nodes[0].name === "paragraph") pcount++;
+
+                    if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update, pcount);
                     else if (update.__className === "MoveOperation") applyMoveOperation(editorInstance, update);
                     else if (update.__className === "AttributeOperation") applyAttributeOperation(editorInstance, update);
                     else if (update.__className === "SplitOperation") applySplitOperation(editorInstance, update);
@@ -144,7 +148,7 @@
             });
         });
 
-        function applyInsertOperation(editor, operation) {
+        function applyInsertOperation(editor, operation, pcount) {
             editor.model.change(writer => {
                 const position = editor.model.createPositionFromPath(
                     editor.model.document.getRoot(operation.position.root),
@@ -156,16 +160,28 @@
                     else writer.insertText(operation.nodes[0].data, position);
                 } else if (operation.nodes[0].name !== undefined) {
                     if (operation.nodes[0].children !== undefined) {
+                        if (pcount === 1) {
+                            // 첫 번째 paragraph는 단순 insertText 실행
+                            let node = operation.nodes[0];
+                            let tag = node.name;
+                            let child = node.children[0];
+                            let text = child.data;
 
-                        for (let i = 0; i < operation.nodes.length; i++) {
-                            let node = operation.nodes[i]
-                            const tag = node.name;
-                            const text = node.children[0].data;
-                            const element = writer.createElement(tag);
-                            writer.insert(element, position);
+                            if (child.attributes !== undefined) writer.insertText(text, child.attributes, position);
+                            else writer.insertText(text, position);
+                        } else {
+                            // 두 번째 paragraph부터는 createElement 진행
+                            for (let i = 0; i < operation.nodes.length; i++) {
+                                node = operation.nodes[i];
+                                tag = node.name;
+                                child = node.children[0];
+                                text = child.data;
+                                let element = writer.createElement(tag);
+                                writer.insert(element, position);
 
-                            if (node.attributes !== undefined) writer.insertText(text, node.attributes, element);
-                            else writer.insertText(text, element);
+                                if (child.attributes !== undefined) writer.insertText(text, child.attributes, element);
+                                else writer.insertText(text, element);
+                            }
                         }
                     } else {
                         const element = writer.createElement(operation.nodes[0].name);
