@@ -85,31 +85,24 @@
 
             docHub.client.ReceiveContent = function (content) {
                 const updates = JSON.parse(content);
-                let pcount = 0;
 
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
                     console.log(update)
-                    console.log("now: "+ baseVersion)
-                    if (update.baseVersion <= baseVersion) continue;
                     isSyncing = true;
-                    baseVersion = update.baseVersion;
-                    if (update.nodes !== undefined && update.nodes[0].name !== undefined && update.nodes[0].name === "paragraph") pcount++;
 
-                    if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update, pcount);
+                    if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
                     else if (update.__className === "MoveOperation") applyMoveOperation(editorInstance, update);
                     else if (update.__className === "AttributeOperation") applyAttributeOperation(editorInstance, update);
                     else if (update.__className === "SplitOperation") applySplitOperation(editorInstance, update);
                     else if (update.__className === "MergeOperation") applyMergeOperation(editorInstance, update);
                     else if (update.__className === "RenameOperation") applyRenameOperation(editorInstance, update);
-                }
 
+                    isSyncing = false;
+                }
+                // 수신 Data Debug
                 console.log("<수신 내역>")
                 console.log(updates);
-
-                //isSyncing = true;
-                //editorInstance.setData(content);
-                //isSyncing = false;
             };
 
             docHub.client.ReceiveView = function (view) {
@@ -122,18 +115,13 @@
             });
 
             editorInstance.model.document.on('change:data', function (evt, batch) {
-                if (isSyncing) {
-                    isSyncing = false;
-                    return;
-                }
+                if (isSyncing) return;
+                // 송신 Data Debug
                 console.log("<배치 내역>")
-                console.log(batch.operations.filter((op) => op.isDocumentOperation));
-                const sendOperations = batch.operations.filter((op) => op.isDocumentOperation).map((op) => op.toJSON());
+                console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
+                const sendOperations = batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion).map((op) => op.toJSON());
                 docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
                 baseVersion = sendOperations.at(-1).baseVersion;
-
-                //if (isSyncing) return;
-                //setTimeout(() => docHub.server.updateContent(groupName, editorInstance.getData()), 10);
             });
 
             $.connection.hub.start().done(function () {
@@ -148,43 +136,63 @@
             });
         });
 
-        function applyInsertOperation(editor, operation, pcount) {
+        function applyInsertOperation(editor, operation) {
             editor.model.change(writer => {
-                const position = editor.model.createPositionFromPath(
-                    editor.model.document.getRoot(operation.position.root),
-                    operation.position.path
-                );
-                console.log(operation)
-                if (operation.nodes[0].data !== undefined) {
-                    if (operation.nodes[0].attributes !== undefined) writer.insertText(operation.nodes[0].data, operation.nodes[0].attributes, position);
-                    else writer.insertText(operation.nodes[0].data, position);
-                } else if (operation.nodes[0].name !== undefined) {
-                    if (operation.nodes[0].children !== undefined) {
-                        if (pcount === 1) {
-                            // 첫 번째 paragraph는 단순 insertText 실행
-                            let node = operation.nodes[0];
+                // operation에 속한 노드, 필요한 정보를 담고 있다. (textData 혹은 p태그 등)
+                let nodes = operation.nodes[0];
+
+                // nodes.data가 존재하면 text를 insert한다.
+                if (nodes.data !== undefined) {
+
+                    let position = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.position.root),
+                        operation.position.path
+                    );
+                    console.log(nodes.attributes)
+                    console.log(operation.position.path)
+                    if (nodes.attributes !== undefined) writer.insertText(nodes.data, nodes.attributes, position);
+                    else writer.insertText(nodes.data, position);
+
+                }
+                // nodes.name이 존재하면 태그를 insert한다.
+                else if (nodes.name !== undefined) {
+
+                    // 태그의 자식 태그에 text 정보가 있다.
+                    if (nodes.children !== undefined) {
+                        let start = 0;
+                        if (operation.position.path.length == 1 && operation.position.path[0] === 0) {
+                            start = 1;
+                            const root = editor.model.document.getRoot();
+                            const firstParagraph = root.getChild(0);
+                            if (nodes.children[0].attributes !== undefined) writer.insertText(nodes.children[0].data, nodes.children[0].attributes, firstParagraph, 0);
+                            else writer.insertText(nodes.children[0].data, firstParagraph, 0);
+                        }
+                        let path = operation.position.path;
+                        for (let i = start; i < operation.nodes.length; i++) {
+                            let node = operation.nodes[i];
                             let tag = node.name;
                             let child = node.children[0];
                             let text = child.data;
+                            let element = writer.createElement(tag);
+                            let position = editor.model.createPositionFromPath(
+                                editor.model.document.getRoot(operation.position.root), path
+                            );
 
-                            if (child.attributes !== undefined) writer.insertText(text, child.attributes, position);
-                            else writer.insertText(text, position);
-                        } else {
-                            // 두 번째 paragraph부터는 createElement 진행
-                            for (let i = 0; i < operation.nodes.length; i++) {
-                                node = operation.nodes[i];
-                                tag = node.name;
-                                child = node.children[0];
-                                text = child.data;
-                                let element = writer.createElement(tag);
-                                writer.insert(element, position);
+                            writer.insert(element, position);
+                            path[0]++;
 
-                                if (child.attributes !== undefined) writer.insertText(text, child.attributes, element);
-                                else writer.insertText(text, element);
-                            }
+                            if (child.attributes !== undefined) writer.insertText(text, child.attributes, element);
+                            else writer.insertText(text, element);
                         }
                     } else {
-                        const element = writer.createElement(operation.nodes[0].name);
+                        let node = operation.nodes[0];
+                        let tag = node.name;
+                        // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생. 이런 예외를 방지
+                        if (tag === 'paragraph' && operation.position.path.length == 1 && operation.position.path[0] === 0) return;
+                        let element = writer.createElement(tag);
+                        let position = editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.position.root), operation.position.path
+                        );
                         writer.insert(element, position);
                     }
                 }
