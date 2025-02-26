@@ -2,6 +2,7 @@
 
 <asp:Content ID="Content" ContentPlaceHolderID="Content" runat="server">
     <form id="form1" runat="server">
+        <asp:ScriptManager ID="sm" EnablePageMethods="true" runat="server"/>
     <div class="container">
         <div class="post-form">
             <h3 class="text-bold">공동 문서 편집</h3>
@@ -34,12 +35,12 @@
                     <div class="editor-container__editor"><div id="editor"></div></div>
                 </div>
              </div>
-            
+
             <!-- 버튼 -->
             <div class="row-list">
                 <div class="row-list">
-                    <asp:Button ID="btnLoad" runat="server" Text="PDF" CssClass="sky-btn" OnClick="BtnUpdate_Click" />
-                    <asp:Button ID="btnUpdate" runat="server" Text="저장" CssClass="sky-btn" OnClick="BtnUpdate_Click" />
+                    <asp:Button ID="btnLoad" runat="server" Text="PDF" CssClass="sky-btn" OnClientClick="saveDocumentToDB()" />
+                    <asp:Button ID="btnUpdate" runat="server" Text="저장" CssClass="sky-btn" OnClientClick="saveDocumentToDB()" />
                 </div>
                 <div class="row-list">
                     <button type="button" class="gray-btn" onclick="location.href='Detail.aspx?Id=<%= HttpUtility.HtmlEncode(Request.QueryString["PostId"]) %>';">뒤로가기</button>
@@ -64,6 +65,8 @@
         var groupName = '<%= HttpUtility.HtmlEncode(Request.QueryString["Id"]) %>';
         let baseVersion = 0;
 
+        let autoSaveInterval;
+
         // CKEditor 설정
         DecoupledEditor.create(document.querySelector('#editor'), editorConfig).then(editor => {
             editorInstance = editor;
@@ -87,8 +90,8 @@
                 const updates = JSON.parse(content);
 
                 // 수신 Data Debug
-                console.log("<수신 내역>")
-                console.log(updates);
+                //console.log("<수신 내역>")
+                //console.log(updates);
 
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
@@ -108,6 +111,7 @@
 
             docHub.client.ReceiveView = function (view) {
                 $("#<%= lblView.ClientID %>").text(view);
+                if (view === 1 && autoSaveInterval !== null) startAutoSave();
             }
 
             // 입력 시 변경 사항 전송
@@ -117,8 +121,8 @@
             editorInstance.model.document.on('change:data', function (evt, batch) {
                 if (isSyncing) return;
                 // 송신 Data Debug
-                console.log("<배치 내역>")
-                console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
+                //console.log("<배치 내역>")
+                //console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
                 const sendOperations = batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion).map((op) => op.toJSON());
                 docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
                 baseVersion = sendOperations.at(-1).baseVersion;
@@ -198,7 +202,7 @@
                         } else {
                             let node = operation.nodes[0];
                             let tag = node.name;
-                            // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생. 이런 예외를 방지
+                            // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생하는 예외를 방지
                             if (tag === 'paragraph' && operation.position.path.length == 1 && operation.position.path[0] === 0) return;
                             let element = writer.createElement(tag);
                             let position = editor.model.createPositionFromPath(
@@ -325,6 +329,48 @@
                 console.log(error.message)
             }
             
+        }
+
+        function startAutoSave() {
+            console.log("startAutoSave start")
+            autoSaveInterval = setInterval(() => saveDocumentToRedis(), 5000);
+        }
+
+        function saveDocumentToRedis() {
+            let title = $("#<%= txtTitle.ClientID %>").val();
+            let content = editorInstance.getData();
+            PageMethods.SaveDocumentToRedis(groupName, title, content, function (result) {
+                console.log("임시저장 완료!");
+                console.log(`제목:${title}`);
+                console.log(`내용:${content}`);
+            });
+        }
+
+        function saveDocumentToDB() {
+            let title = $("#<%= txtTitle.ClientID %>").val();
+            let content = document.querySelector("#editor").innerHTML;
+            PageMethods.SaveDocumentToDB(groupName, title, content, function (result) {
+                showAlert(result);
+            });
+        }
+
+        // 처리 결과에 따른 Alert
+        function showAlert(message) {
+            let title = "경고";
+            let icon = "error";
+            if (message.includes("정상")) {
+                title = "성공";
+                icon = "success";
+            }
+            Swal.fire({
+                title: title,
+                text: message,
+                icon: icon,
+                confirmButtonText: "확인",
+                customClass: {
+                    confirmButton: "blue-btn"
+                }
+            });
         }
     </script>
 </asp:Content>

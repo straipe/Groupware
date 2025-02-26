@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Web;
+using System.Web.Services;
 using System.Web.UI;
+using System.Xml.Linq;
 using groupware2.Models;
 using groupware2.Utils;
 using StackExchange.Redis;
@@ -11,8 +14,9 @@ namespace groupware2.View
 {
     public partial class DocumentForm : System.Web.UI.Page
     {
-        private readonly IDatabase _redis = RedisManager.Connection.GetDatabase();
+        private static readonly IDatabase _redis = RedisManager.Connection.GetDatabase();
         protected void Page_Load(object sender, EventArgs e){
+            if (IsAjaxRequest()) return;
             int Id = int.Parse(Request.QueryString["Id"]);
 
             if (!IsPostBack) {
@@ -25,22 +29,6 @@ namespace groupware2.View
                 hlList.NavigateUrl = SecurityHelper.VerifyAdmin(Page) ? "AdminList.aspx" : "List.aspx";
             }
             Load_Data(Id);
-        }
-
-        protected void BtnUpdate_Click(object sender, EventArgs e)
-        {
-            int Id = int.Parse(Request.QueryString["Id"]);
-            string key = $"Document:{Id}";
-            using (var context = new AppDBContext())
-            {
-                var document = context.Documents.FirstOrDefault(d => d.Id == Id);
-                string title = _redis.HashGet(key, "title").ToString();
-                document.Title = HttpUtility.HtmlEncode(title);
-                string content = _redis.HashGet(key, "content").ToString();
-                document.Content= HttpUtility.HtmlEncode(content);
-                context.SaveChanges();
-                ScriptHelper.ShowAlert(this, "성공", "문서가 정상적으로 저장되었습니다.", "success", "successUpdateDocument");
-            }
         }
 
         protected void Load_Data(int Id)
@@ -61,6 +49,36 @@ namespace groupware2.View
             string content = _redis.HashGet(key, "content").ToString();
             string script = $"document.querySelector('#editor').innerHTML = '{content}';";
             ScriptManager.RegisterStartupScript(this, this.GetType(), "AddContent", script, true);
+        }
+
+        [WebMethod]
+        public static string SaveDocumentToRedis(string groupName, string title, string content)
+        {
+            string key = $"Document:{groupName}";
+            _redis.HashSet(key, "title", HttpUtility.HtmlDecode(title));
+            _redis.HashSet(key, "content", HttpUtility.HtmlDecode(content));
+            return "문서가 임시 저장되었습니다.";
+        }
+
+        [WebMethod]
+        public static string SaveDocumentToDB(string groupName, string title, string content)
+        {
+            string key = $"Document:{groupName}";
+            int Id = int.Parse(groupName);
+            using (var context = new AppDBContext())
+            {
+                var document = context.Documents.FirstOrDefault(d => d.Id == Id);
+                document.Title = HttpUtility.HtmlEncode(title);
+                document.Content = HttpUtility.HtmlEncode(content);
+                context.SaveChanges();
+            }
+
+            return "문서가 정상적으로 저장되었습니다.";
+        }
+
+        private bool IsAjaxRequest()
+        {
+            return Request.Headers["X-Requested-With"] == "XMLHttpRequest";
         }
     }
 }
