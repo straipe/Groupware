@@ -86,6 +86,10 @@
             docHub.client.ReceiveContent = function (content) {
                 const updates = JSON.parse(content);
 
+                // 수신 Data Debug
+                console.log("<수신 내역>")
+                console.log(updates);
+
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
                     console.log(update)
@@ -100,9 +104,6 @@
 
                     isSyncing = false;
                 }
-                // 수신 Data Debug
-                console.log("<수신 내역>")
-                console.log(updates);
             };
 
             docHub.client.ReceiveView = function (view) {
@@ -113,7 +114,6 @@
             $("#<%= txtTitle.ClientID %>").on("input", function () {
                 docHub.server.updateTitle(groupName, $(this).val());
             });
-
             editorInstance.model.document.on('change:data', function (evt, batch) {
                 if (isSyncing) return;
                 // 송신 Data Debug
@@ -137,149 +137,194 @@
         });
 
         function applyInsertOperation(editor, operation) {
-            editor.model.change(writer => {
-                // operation에 속한 노드, 필요한 정보를 담고 있다. (textData 혹은 p태그 등)
-                let nodes = operation.nodes[0];
+            try {
+                editor.model.change(writer => {
+                    // operation에 속한 노드, 필요한 정보를 담고 있다. (textData 혹은 p태그 등)
+                    let nodes = operation.nodes[0];
 
-                // nodes.data가 존재하면 text를 insert한다.
-                if (nodes.data !== undefined) {
+                    // nodes.data가 존재하면 text를 insert한다.
+                    if (nodes.data !== undefined) {
 
-                    let position = editor.model.createPositionFromPath(
-                        editor.model.document.getRoot(operation.position.root),
-                        operation.position.path
-                    );
-                    console.log(nodes.attributes)
-                    console.log(operation.position.path)
-                    if (nodes.attributes !== undefined) writer.insertText(nodes.data, nodes.attributes, position);
-                    else writer.insertText(nodes.data, position);
+                        let position = editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.position.root),
+                            operation.position.path
+                        );
 
-                }
-                // nodes.name이 존재하면 태그를 insert한다.
-                else if (nodes.name !== undefined) {
-
-                    // 태그의 자식 태그에 text 정보가 있다.
-                    if (nodes.children !== undefined) {
-                        let start = 0;
-                        if (operation.position.path.length == 1 && operation.position.path[0] === 0) {
-                            start = 1;
-                            const root = editor.model.document.getRoot();
-                            const firstParagraph = root.getChild(0);
-                            if (nodes.children[0].attributes !== undefined) writer.insertText(nodes.children[0].data, nodes.children[0].attributes, firstParagraph, 0);
-                            else writer.insertText(nodes.children[0].data, firstParagraph, 0);
+                        // 텍스트 삽입 디버그
+                        //console.log(editor.model.document.getRoot().getChild(0)); 
+                        //console.log(nodes.attributes)
+                        //console.log(operation.position.path)
+                        if (nodes.attributes !== undefined) {
+                            if (nodes.attributes.listIndent !== undefined) {
+                                delete nodes.attributes.listIndent;
+                                delete nodes.attributes.listItemId;
+                                delete nodes.attributes.listType;
+                            }
+                            writer.insertText(nodes.data, nodes.attributes, position);
                         }
-                        let path = operation.position.path;
-                        for (let i = start; i < operation.nodes.length; i++) {
-                            let node = operation.nodes[i];
+                        else writer.insertText(nodes.data, position);
+
+                    }
+                    // nodes.name이 존재하면 태그를 insert한다.
+                    else if (nodes.name !== undefined) {
+
+                        // 태그의 자식 태그에 text 정보가 있다.
+                        if (nodes.children !== undefined) {
+                            let start = 0;
+                            if (operation.position.path.length == 1 && operation.position.path[0] === 0) {
+                                start = 1;
+                                const root = editor.model.document.getRoot();
+                                const firstParagraph = root.getChild(0);
+                                if (nodes.children[0].attributes !== undefined) writer.insertText(nodes.children[0].data, nodes.children[0].attributes, firstParagraph, 0);
+                                else writer.insertText(nodes.children[0].data, firstParagraph, 0);
+                            }
+                            let path = operation.position.path;
+                            for (let i = start; i < operation.nodes.length; i++) {
+                                let node = operation.nodes[i];
+                                let tag = node.name;
+                                let child = node.children[0];
+                                let text = child.data;
+                                let element = writer.createElement(tag);
+                                let position = editor.model.createPositionFromPath(
+                                    editor.model.document.getRoot(operation.position.root), path
+                                );
+
+                                writer.insert(element, position);
+                                path[0]++;
+
+                                if (child.attributes !== undefined) writer.insertText(text, child.attributes, element);
+                                else writer.insertText(text, element);
+                            }
+                        } else {
+                            let node = operation.nodes[0];
                             let tag = node.name;
-                            let child = node.children[0];
-                            let text = child.data;
+                            // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생. 이런 예외를 방지
+                            if (tag === 'paragraph' && operation.position.path.length == 1 && operation.position.path[0] === 0) return;
                             let element = writer.createElement(tag);
                             let position = editor.model.createPositionFromPath(
-                                editor.model.document.getRoot(operation.position.root), path
+                                editor.model.document.getRoot(operation.position.root), operation.position.path
                             );
-
                             writer.insert(element, position);
-                            path[0]++;
-
-                            if (child.attributes !== undefined) writer.insertText(text, child.attributes, element);
-                            else writer.insertText(text, element);
                         }
-                    } else {
-                        let node = operation.nodes[0];
-                        let tag = node.name;
-                        // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생. 이런 예외를 방지
-                        if (tag === 'paragraph' && operation.position.path.length == 1 && operation.position.path[0] === 0) return;
-                        let element = writer.createElement(tag);
-                        let position = editor.model.createPositionFromPath(
-                            editor.model.document.getRoot(operation.position.root), operation.position.path
-                        );
-                        writer.insert(element, position);
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.log("[수신] 삽입 에러 발생")
+                console.log(error.message)
+            }
+            
         }
 
         function applyMoveOperation(editor, operation) {
-            editor.model.change(writer => {
-                const sourceRange = editor.model.createRange(
-                    editor.model.createPositionFromPath(
-                        editor.model.document.getRoot(operation.sourcePosition.root),
-                        operation.sourcePosition.path
-                    ),
-                    editor.model.createPositionFromPath(
-                        editor.model.document.getRoot(operation.sourcePosition.root),
-                        operation.sourcePosition.path.map((v, i) => (i === operation.sourcePosition.path.length - 1 ? v + operation.howMany : v))
-                    )
-                );
+            try {
+                editor.model.change(writer => {
+                    const sourceRange = editor.model.createRange(
+                        editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.sourcePosition.root),
+                            operation.sourcePosition.path
+                        ),
+                        editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.sourcePosition.root),
+                            operation.sourcePosition.path.map((v, i) => (i === operation.sourcePosition.path.length - 1 ? v + operation.howMany : v))
+                        )
+                    );
 
-                const targetPosition = editor.model.createPositionFromPath(
-                    editor.model.document.getRoot(operation.targetPosition.root),
-                    operation.targetPosition.path
-                );
+                    const targetPosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.targetPosition.root),
+                        operation.targetPosition.path
+                    );
 
-                writer.move(sourceRange, targetPosition);
-            });
+                    writer.move(sourceRange, targetPosition);
+                });
+            } catch (error) {
+                console.log("[수신] 제거 에러 발생")
+                console.log(error.message);
+            }
+            
         }
 
         function applyAttributeOperation(editor, operation) {
-            editor.model.change(writer => {
-                if (operation.key.startsWith("selection:")) {
-                    const selectionKey = operation.key.substring("selection:".length);
-                    writer.setSelectionAttribute(selectionKey, operation.newValue);
-                }
-                else {
-                    const startPosition = editor.model.createPositionFromPath(
-                        editor.model.document.getRoot(operation.range.start.root),
-                        operation.range.start.path
-                    );
+            try {
+                editor.model.change(writer => {
+                    if (operation.key.startsWith("selection:")) {
+                        const selectionKey = operation.key.substring("selection:".length);
+                        writer.setSelectionAttribute(selectionKey, operation.newValue);
+                    }
+                    else {
+                        const startPosition = editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.range.start.root),
+                            operation.range.start.path
+                        );
 
-                    const endPosition = editor.model.createPositionFromPath(
-                        editor.model.document.getRoot(operation.range.end.root),
-                        operation.range.end.path
-                    );
+                        const endPosition = editor.model.createPositionFromPath(
+                            editor.model.document.getRoot(operation.range.end.root),
+                            operation.range.end.path
+                        );
 
-                    const range = editor.model.createRange(startPosition, endPosition);
-
-                    writer.setAttribute(operation.key, operation.newValue, range);
-                }
-            });
+                        const range = editor.model.createRange(startPosition, endPosition);
+                        writer.setAttribute(operation.key, operation.newValue, range);
+                    }
+                });
+            } catch (error) {
+                console.log("[수신] 속성 에러 발생")
+                console.log(error.message);
+            }
+            
         }
 
         function applySplitOperation(editor, operation) {
-            editor.model.change(writer => {
-                const splitPosition = editor.model.createPositionFromPath(
-                    editor.model.document.getRoot(operation.splitPosition.root),
-                    operation.splitPosition.path
-                );
-                writer.split(splitPosition);
-            });
+            try {
+                editor.model.change(writer => {
+                    const splitPosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.splitPosition.root),
+                        operation.splitPosition.path
+                    );
+                    writer.split(splitPosition);
+                });
+            } catch (error) {
+                console.log("[수신] 분할 에러 발생")
+                console.log(error.message)
+            }
+            
         }
 
         function applyMergeOperation(editor, operation) {
-            editor.model.change(writer => {
-                operation.sourcePosition.path.pop()
+            try {
+                editor.model.change(writer => {
+                    operation.sourcePosition.path.pop()
 
-                const sourcePosition = editor.model.createPositionFromPath(
-                    editor.model.document.getRoot(operation.sourcePosition.root),
-                    operation.sourcePosition.path
-                );
+                    const sourcePosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot(operation.sourcePosition.root),
+                        operation.sourcePosition.path
+                    );
 
-                writer.merge(sourcePosition)
-            });
+                    writer.merge(sourcePosition)
+                });
+            } catch (error) {
+                console.log("[수신] 병합 에러 발생")
+                console.log(error.message)
+            }
+            
         }
 
         function applyRenameOperation(editor, operation) {
-            editor.model.change(writer => {
-                operation.position.path.push(0)
+            try {
+                editor.model.change(writer => {
+                    operation.position.path.push(0)
 
-                const sourcePosition = editor.model.createPositionFromPath(
-                    editor.model.document.getRoot("main"),
-                    operation.position.path
-                );
-                
-                const sourceParent = sourcePosition.parent;
-                writer.rename(sourceParent, operation.newName);
-            })
+                    const sourcePosition = editor.model.createPositionFromPath(
+                        editor.model.document.getRoot("main"),
+                        operation.position.path
+                    );
+
+                    const sourceParent = sourcePosition.parent;
+                    writer.rename(sourceParent, operation.newName);
+                })
+            } catch (error) {
+                console.log("[수신] 태그 에러 발생")
+                console.log(error.message)
+            }
+            
         }
     </script>
 </asp:Content>
