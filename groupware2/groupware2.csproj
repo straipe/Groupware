@@ -135,6 +135,7 @@
   <ItemGroup>
     <Content Include="Content\editor.css" />
     <Content Include="Content\Images\logo.jpg" />
+    <Content Include="Content\Images\refresh-button.png" />
     <Content Include="Content\Images\view-icon.png" />
     <Content Include="Content\Sql\script.sql" />
     <Content Include="Content\styles.css" />

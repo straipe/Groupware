@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Web.UI.WebControls;
 using groupware2.Utils;
 using Microsoft.AspNet.SignalR;
 using StackExchange.Redis;
@@ -64,20 +65,14 @@ namespace groupware2.Hubs
 
         public void UpdateTitle(string groupName, string title)
         {
-            string key = $"Document:{groupName}";
-            //if (!RedisManager.IsLock(key, 5)) return;
-            _redis.HashSet(key, "title", title);
-            Clients.OthersInGroup(groupName).ReceiveTitle(_redis.HashGet(key, "title").ToString());
+            Debug.WriteLine($"전송받은 글 제목: {title}");
+            Clients.OthersInGroup(groupName).ReceiveTitle(title);
         }
 
         public void UpdateContent(string groupName, string content)
         {
-            Debug.WriteLine($"전송받은 데이터: {content}");
+            Debug.WriteLine($"전송받은 글 내용: {content}");
             Clients.OthersInGroup(groupName).ReceiveContent(content);
-            //string key = $"Document:{groupName}";
-            //if (!RedisManager.IsLock(key, 5)) return;
-            //_redis.HashSet(key, "content", content);
-            //Clients.OthersInGroup(groupName).ReceiveContent(_redis.HashGet(key, "content").ToString());
         }
     }
 }
