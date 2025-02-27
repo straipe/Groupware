@@ -15,6 +15,7 @@
                 <span class="text-gray">
                     <asp:Label ID="lblCreatedAt" runat="server" Text=""></asp:Label>
                 </span>
+                <img src="~/Content/Images/refresh-button.png" style="width: 20px; margin-left:10px; cursor:pointer;" runat="server" onclick="location.reload();"/>
                 <img src="~/Content/Images/view-icon.png" style="width: 20px; margin-left:10px;" runat="server"/>
                 <span class="text-gray">
                     <asp:Label ID="lblView" runat="server" Text="1"></asp:Label>
@@ -28,6 +29,7 @@
                               
             <!-- 문서 내용 입력 -->
             <asp:Label ID="lblContent" runat="server" Text="내용" CssClass="form-label" />
+            
             <div class="editor-container editor-container_document-editor editor-container_include-style" id="editor-container">
                 <div class="editor-container__menu-bar" id="editor-menu-bar"></div>
                 <div class="editor-container__toolbar" id="editor-toolbar"></div>
@@ -88,12 +90,13 @@
                 const updates = JSON.parse(content);
 
                 // 수신 Data Debug
-                console.log("<수신 내역>")
-                console.log(updates);
+                //console.log("<수신 내역>")
+                //console.log(updates);
 
+                editorInstance.enableReadOnlyMode("receive-lock");
+                isSyncing = true;
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
-                    isSyncing = true;
 
                     if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
                     else if (update.__className === "MoveOperation") applyMoveOperation(editorInstance, update);
@@ -101,14 +104,14 @@
                     else if (update.__className === "SplitOperation") applySplitOperation(editorInstance, update);
                     else if (update.__className === "MergeOperation") applyMergeOperation(editorInstance, update);
                     else if (update.__className === "RenameOperation") applyRenameOperation(editorInstance, update);
-
-                    isSyncing = false;
                 }
+                isSyncing = false;
+                editorInstance.disableReadOnlyMode("receive-lock");
             };
 
             docHub.client.ReceiveView = function (view) {
                 $("#<%= lblView.ClientID %>").text(view);
-                if (view === 1 && autoSaveInterval !== undefined) startAutoSave();
+                if (view === 1 && autoSaveInterval == undefined) startAutoSave();
             }
 
             // 입력 시 변경 사항 전송
@@ -119,8 +122,8 @@
             editorInstance.model.document.on('change:data', function (evt, batch) {
                 if (isSyncing) return;
                 // 송신 Data Debug
-                console.log("<배치 내역>")
-                console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
+                //console.log("<배치 내역>")
+                //console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
                 const sendOperations = batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion).map((op) => op.toJSON());
                 docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
                 baseVersion = sendOperations.at(-1).baseVersion;
@@ -339,7 +342,7 @@
         }
 
         function startAutoSave() {
-            console.log("startAutoSave start")
+            console.log("자동 임시저장 시작!")
             autoSaveInterval = setInterval(() => saveDocumentToRedis(), 5000);
         }
 

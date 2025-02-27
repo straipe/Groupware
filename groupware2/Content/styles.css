@@ -452,6 +452,10 @@ a {
     width: 120px;
 }
 
+.refresh {
+    width: 30px;
+}
+
 .footer {
     background-color: #f8f9fa;
     color: #6c757d;
