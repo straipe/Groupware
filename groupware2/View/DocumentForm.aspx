@@ -72,8 +72,6 @@
             editorInstance = editor;
             document.querySelector('#editor-toolbar').appendChild(editor.ui.view.toolbar.element);
             document.querySelector('#editor-menu-bar').appendChild(editor.ui.view.menuBarView.element);
-            const operations = editorInstance.model.document.history.getOperations();
-            startOperIdx = operations.length;
         });
 
 
@@ -90,12 +88,11 @@
                 const updates = JSON.parse(content);
 
                 // 수신 Data Debug
-                //console.log("<수신 내역>")
-                //console.log(updates);
+                console.log("<수신 내역>")
+                console.log(updates);
 
                 for (let i = 0; i < updates.length; i++) {
                     let update = updates[i];
-                    console.log(update)
                     isSyncing = true;
 
                     if (update.__className === "InsertOperation") applyInsertOperation(editorInstance, update);
@@ -111,18 +108,19 @@
 
             docHub.client.ReceiveView = function (view) {
                 $("#<%= lblView.ClientID %>").text(view);
-                if (view === 1 && autoSaveInterval !== null) startAutoSave();
+                if (view === 1 && autoSaveInterval !== undefined) startAutoSave();
             }
 
             // 입력 시 변경 사항 전송
             $("#<%= txtTitle.ClientID %>").on("input", function () {
                 docHub.server.updateTitle(groupName, $(this).val());
             });
+
             editorInstance.model.document.on('change:data', function (evt, batch) {
                 if (isSyncing) return;
                 // 송신 Data Debug
-                //console.log("<배치 내역>")
-                //console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
+                console.log("<배치 내역>")
+                console.log(batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion));
                 const sendOperations = batch.operations.filter((op) => op.isDocumentOperation && op.baseVersion > baseVersion).map((op) => op.toJSON());
                 docHub.server.updateContent(groupName, JSON.stringify(sendOperations));
                 baseVersion = sendOperations.at(-1).baseVersion;
@@ -144,10 +142,10 @@
             try {
                 editor.model.change(writer => {
                     // operation에 속한 노드, 필요한 정보를 담고 있다. (textData 혹은 p태그 등)
-                    let nodes = operation.nodes[0];
+                    let node = operation.nodes[0];
 
                     // nodes.data가 존재하면 text를 insert한다.
-                    if (nodes.data !== undefined) {
+                    if (node.data !== undefined) {
 
                         let position = editor.model.createPositionFromPath(
                             editor.model.document.getRoot(operation.position.root),
@@ -156,39 +154,46 @@
 
                         // 텍스트 삽입 디버그
                         //console.log(editor.model.document.getRoot().getChild(0)); 
-                        //console.log(nodes.attributes)
+                        //console.log(node.attributes)
                         //console.log(operation.position.path)
-                        if (nodes.attributes !== undefined) {
-                            if (nodes.attributes.listIndent !== undefined) {
-                                delete nodes.attributes.listIndent;
-                                delete nodes.attributes.listItemId;
-                                delete nodes.attributes.listType;
+                        if (node.attributes !== undefined) {
+                            if (node.attributes.listIndent !== undefined) {
+                                delete node.attributes.listIndent;
+                                delete node.attributes.listItemId;
+                                delete node.attributes.listType;
                             }
-                            writer.insertText(nodes.data, nodes.attributes, position);
+                            writer.insertText(node.data, node.attributes, position);
                         }
-                        else writer.insertText(nodes.data, position);
+                        else writer.insertText(node.data, position);
 
                     }
                     // nodes.name이 존재하면 태그를 insert한다.
-                    else if (nodes.name !== undefined) {
+                    else if (node.name !== undefined) {
 
                         // 태그의 자식 태그에 text 정보가 있다.
-                        if (nodes.children !== undefined) {
+                        if (node.children !== undefined) {
                             let start = 0;
                             if (operation.position.path.length == 1 && operation.position.path[0] === 0) {
                                 start = 1;
                                 const root = editor.model.document.getRoot();
                                 const firstParagraph = root.getChild(0);
-                                if (nodes.children[0].attributes !== undefined) writer.insertText(nodes.children[0].data, nodes.children[0].attributes, firstParagraph, 0);
-                                else writer.insertText(nodes.children[0].data, firstParagraph, 0);
+
+                                // 태그의 스타일 정보가 있다.
+                                if (node.attributes !== undefined) writer.setAttributes(node.attributes, firstParagraph);
+
+                                if (node.children[0].attributes !== undefined) writer.insertText(node.children[0].data, node.children[0].attributes, firstParagraph, 0);
+                                else writer.insertText(node.children[0].data, firstParagraph, 0);
                             }
                             let path = operation.position.path;
                             for (let i = start; i < operation.nodes.length; i++) {
-                                let node = operation.nodes[i];
+                                node = operation.nodes[i];
                                 let tag = node.name;
                                 let child = node.children[0];
                                 let text = child.data;
                                 let element = writer.createElement(tag);
+
+                                if (node.attributes !== undefined) writer.setAttributes(node.attributes, element);
+
                                 let position = editor.model.createPositionFromPath(
                                     editor.model.document.getRoot(operation.position.root), path
                                 );
@@ -200,11 +205,13 @@
                                 else writer.insertText(text, element);
                             }
                         } else {
-                            let node = operation.nodes[0];
                             let tag = node.name;
                             // 2줄 이상 삭제 + 첫 줄 포함이면 paragraph 태그 자동 생성 현상이 발생하는 예외를 방지
                             if (tag === 'paragraph' && operation.position.path.length == 1 && operation.position.path[0] === 0) return;
                             let element = writer.createElement(tag);
+
+                            if (nodes.attributes !== undefined) writer.setAttributes(nodes.attributes, element);
+
                             let position = editor.model.createPositionFromPath(
                                 editor.model.document.getRoot(operation.position.root), operation.position.path
                             );

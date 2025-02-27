@@ -22,6 +22,7 @@ namespace groupware2.Hubs
             {
                 _redis.HashSet(key, "count", 1);
                 Debug.WriteLine($"현재 문서의 접속자 수:1");
+                Clients.Caller.ReceiveView(1);
             } else
             {
                 if (int.TryParse(_redis.HashGet(key, "count"), out int count))
@@ -64,7 +65,7 @@ namespace groupware2.Hubs
         public void UpdateTitle(string groupName, string title)
         {
             string key = $"Document:{groupName}";
-            if (!RedisManager.IsLock(key, 5)) return;
+            //if (!RedisManager.IsLock(key, 5)) return;
             _redis.HashSet(key, "title", title);
             Clients.OthersInGroup(groupName).ReceiveTitle(_redis.HashGet(key, "title").ToString());
         }
