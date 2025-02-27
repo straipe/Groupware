@@ -22,8 +22,8 @@
             </div>
             <hr class="gray-line"/>
 
-            <!-- 문서 이름 입력 -->
-            <asp:Label ID="lblTitle" runat="server" Text="문서 이름" CssClass="form-label" />
+            <!-- 문서 제목 입력 -->
+            <asp:Label ID="lblTitle" runat="server" Text="제목" CssClass="form-label" />
             <asp:TextBox ID="txtTitle" runat="server" Width="100%" CssClass="form-control" />
                               
             <!-- 문서 내용 입력 -->

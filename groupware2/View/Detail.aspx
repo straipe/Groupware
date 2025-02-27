@@ -27,7 +27,7 @@
 
             <!-- 문서 내용 -->
             <div style="min-height:200px; padding: 8px;">
-                <asp:Label ID="lblContent" runat="server" Text="" CssClass="content-pre"></asp:Label>
+                <asp:Label ID="lblContent" runat="server" Text="" CssClass="ck-content content-pre"></asp:Label>
             </div>
             <hr class="gray-line"/>
 
