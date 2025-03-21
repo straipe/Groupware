@@ -142,10 +142,10 @@ __Front-End__
 ### 공통
 
 __1. 저장소 클론__  
-git clone https://github.com/straipe/Groupware.git
+- git clone https://github.com/straipe/Groupware.git
 
 __2. 디렉토리 이동__  
-cd Groupware
+- cd Groupware
 
 __3. SQL Server & SSMS 설치__
 
@@ -160,7 +160,7 @@ __5. 비밀번호 및 키 값 설정__
 ```
 
 __6. Nuget Package 콘솔에서 Migration 적용__
-Update-Database
+- Update-Database
 
 __7. Redis 다운로드 및 실행__  
 
