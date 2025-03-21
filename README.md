@@ -142,18 +142,26 @@ __Front-End__
 ### 공통
 
 __1. 저장소 클론__  
-git clone https://github.com/straipe/groupware2.git
+git clone https://github.com/straipe/Groupware.git
 
 __2. 디렉토리 이동__  
-cd groupware2
+cd Groupware
 
-__3. SQLServer groupware2 DB 생성 및 script.sql 파일 실행__
+__3. SQL Server & SSMS 설치__
 
-__4. Web.config 파일에서 DB connect string 변경__
+__4. SQLServer groupware2 DB 생성 및 script.sql 파일 실행__
 
-__5. Nuget Package 콘솔에서 Migration 적용__
+__5. 비밀번호 및 키 값 설정__
+- App_GlobalResources 폴더 -> Constants.resx 내 AdminAppPassword(구글 앱 비밀번호), AdminEmail(구글 이메일) 값 설정
+- Scripts 폴더 -> editor.js 내 LICENSE_KEY값 설정(CKEditor)
+- Web.config 파일 -> connectionString의 Server값 변경(SSMS의 Server 이름)
+```
+<add name="groupware2" connectionString="Server=SERVER_NAME;Database=groupware2;Integrated Security=True;" providerName="System.Data.SqlClient" />
+```
+
+__6. Nuget Package 콘솔에서 Migration 적용__
 Update-Database
 
-__6. Redis 다운로드 및 실행__  
+__7. Redis 다운로드 및 실행__  
 
-__7. Visual Studio 2022로 실행(.sin 파일)__  
+__8. Visual Studio 2022로 실행(.sin 파일)__  
